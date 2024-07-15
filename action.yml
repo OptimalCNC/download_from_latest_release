@@ -1,0 +1,88 @@
+name: Download files from release
+inputs:
+  save-path:
+    required: true
+    description: The path (including the filename) to save the downloaded asset to.
+  owner:
+    required: true
+    description: The owner of the repository.
+  repo:
+    required: true
+    description: The repository name.
+  token:
+    required: true
+    default: ${{ github.token }}
+    description: The GitHub token used to authenticate. Must have the content:read permission for private repositories.
+  asset-name-pattern:
+    required: true
+    description: A regular expression pattern to match the asset name. The match must be unique.
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: download pkgs from release
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          async function downloadAsset(owner, repo, asset_id, outputPath) {
+            const response = await github.request('GET /repos/{owner}/{repo}/releases/assets/{asset_id}', {
+              owner: owner,
+              repo: repo,
+              asset_id: asset_id,
+              headers: {
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Accept': 'application/octet-stream'
+              },
+              responseType: 'arraybuffer'
+            });
+
+            // Ensure the directory exists
+            const dir = path.dirname(outputPath);
+            if (!fs.existsSync(dir)){
+              fs.mkdirSync(dir, { recursive: true });
+            }
+
+            // Write the file
+            fs.writeFileSync(outputPath, Buffer.from(response.data));
+            console.log(`Asset downloaded and saved to ${outputPath}`);
+          }
+
+          async function getAssetIdByNamePattern(owner, repo, namePattern) {
+            try {
+              const latestRelease = await github.request('GET /repos/{owner}/{repo}/releases/latest', {
+                owner: owner,
+                repo: repo
+              });
+
+              const assets = latestRelease.data.assets;
+              const regex = new RegExp(namePattern);
+
+              const asset = assets.find(asset => regex.test(asset.name));
+              if (!asset) {
+                throw new Error(`No asset found matching pattern ${namePattern}`);
+              }
+
+              return asset.id;
+            } catch (error) {
+              console.error(`Error fetching asset: ${error.message}`);
+              throw error;
+            }
+          }
+
+          const owner = '${{ inputs.owner }}';
+          const repo = '${{ inputs.repo }}';
+          (async () => {
+            try {
+              const asset_id = await getAssetIdByNamePattern(owner, repo, '${{ inputs.asset-name-pattern }}');
+              console.log(`Asset ID: ${asset_id}`);
+              await downloadAsset(owner, repo, asset_id, '${{ inputs.save-path }}');
+            } catch (error) {
+              console.error(error.message);
+            }
+          })();
+

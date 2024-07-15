@@ -1,0 +1,20 @@
+name: downad from public repository
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          save-path: "neovim.appimage.zsync.sha256sum"
+          owner: "neovim"
+          repo: "neovim"
+          asset-name-pattern: ".*.zsync\\.sha256sum"
+      - name: check file exists
+        run: |
+          ls -l neovim.appimage.zsync.sha256sum
+          cat neovim.appimage.zsync.sha256sum
