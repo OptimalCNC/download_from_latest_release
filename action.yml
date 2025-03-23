@@ -67,7 +67,7 @@ runs:
                 throw new Error(`No asset found matching pattern ${namePattern}`);
               }
 
-              return asset.id;
+              return asset;
             } catch (error) {
               console.error(`Error fetching asset: ${error.message}`);
               throw error;
@@ -78,11 +78,10 @@ runs:
           const repo = '${{ inputs.repo }}';
           (async () => {
             try {
-              const asset_id = await getAssetIdByNamePattern(owner, repo, '${{ inputs.asset-name-pattern }}');
-              console.log(`Asset ID: ${asset_id}`);
-              await downloadAsset(owner, repo, asset_id, '${{ inputs.save-path }}');
+              const asset = await getAssetIdByNamePattern(owner, repo, '${{ inputs.asset-name-pattern }}');
+              console.log(`Asset: name=${asset.name}, id=${asset.id}, updated_at=${asset.updated_at}`);
+              await downloadAsset(owner, repo, asset.id, '${{ inputs.save-path }}');
             } catch (error) {
               console.error(error.message);
             }
           })();
-
